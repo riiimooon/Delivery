@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>تتبع توصيل · Flowermad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --bg:#F2F7EF;
+  --surface:#FFFFFF;
+  --ink:#1B3A2B;
+  --ink2:#5C6F62;
+  --rose:#D6577A;
+  --amber:#D89B3C;
+  --green:#3E7A4F;
+  --green2:#234A33;
+  --track:#E0EBD9;
+  --r:20px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Tajawal',-apple-system,sans-serif;background:var(--bg);color:var(--ink);}
+
+/* ─── SHARED ─────────────────────────────── */
+.hidden{display:none!important;}
+.btn{appearance:none;border:none;border-radius:14px;padding:13px 18px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;transition:transform .1s,opacity .2s;width:100%;}
+.btn:active{transform:scale(.97);}
+.btn[disabled]{opacity:.55;pointer-events:none;}
+.btn-rose{background:var(--rose);color:#fff;}
+.btn-green{background:var(--green);color:#fff;}
+.btn-ghost{background:transparent;color:var(--green2);border:1.5px solid var(--track);}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--green2);color:#fff;padding:9px 18px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;transition:all .22s;pointer-events:none;z-index:9999;}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+input[type=text]{width:100%;padding:11px 13px;border-radius:12px;border:1.5px solid var(--track);font-family:inherit;font-size:14.5px;color:var(--ink);background:#FAFCF8;outline:none;}
+input[type=text]:focus{border-color:var(--rose);}
+label{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:5px;}
+
+/* ─── ADMIN DASHBOARD ─────────────────────── */
+#adminPage{min-height:100dvh;display:flex;flex-direction:column;}
+.admin-top{background:var(--surface);padding:16px 20px 0;border-bottom:1.5px solid var(--track);}
+.brand{font-size:13px;font-weight:800;color:var(--ink2);margin-bottom:12px;}
+.tabs{display:flex;gap:4px;}
+.tab{padding:9px 16px;border-radius:10px 10px 0 0;font-size:14px;font-weight:700;cursor:pointer;color:var(--ink2);background:none;border:none;font-family:inherit;transition:.15s;}
+.tab.active{background:var(--bg);color:var(--rose);}
+
+/* tab panels */
+.panel{flex:1;padding:18px 16px;overflow-y:auto;}
+
+/* map panel */
+#mapPanel{display:flex;flex-direction:column;gap:0;}
+#dashMap{flex:1;min-height:260px;border-radius:var(--r);overflow:hidden;border:1.5px solid var(--track);margin-bottom:14px;}
+.orders-table{background:var(--surface);border-radius:var(--r);overflow:hidden;border:1.5px solid var(--track);}
+.orders-table-head{display:grid;grid-template-columns:1fr 2fr 2fr 1.4fr;gap:0;background:var(--track);padding:9px 12px;font-size:11.5px;font-weight:700;color:var(--ink2);}
+.order-row{display:grid;grid-template-columns:1fr 2fr 2fr 1.4fr;gap:0;padding:11px 12px;border-top:1px solid var(--track);align-items:center;transition:background .15s;}
+.order-row:hover{background:#F5FBF2;}
+.order-row .oid{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--green2);}
+.order-row .oname{font-size:13px;color:var(--ink);}
+.order-row .odist{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;}
+.dist-far{color:var(--rose);}
+.dist-mid{color:var(--amber);}
+.dist-near{color:var(--green);}
+.dist-done{color:var(--green2);}
+.obadge{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:2px 8px;}
+.badge-live{background:#FFF0F4;color:var(--rose);}
+.badge-idle{background:var(--track);color:var(--ink2);}
+.badge-done{background:#EAF7EE;color:var(--green2);}
+.empty-state{text-align:center;padding:40px 20px;color:var(--ink2);font-size:14px;}
+
+/* add order panel */
+#addPanel{display:flex;flex-direction:column;gap:14px;}
+#addPanel h2{font-size:16px;font-weight:800;}
+.field-block{display:flex;flex-direction:column;gap:5px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.search-row{display:flex;gap:8px;}
+.search-row input{flex:1;}
+.search-row button{flex-shrink:0;border:none;background:var(--green);color:#fff;border-radius:12px;padding:0 14px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}
+#addMap{height:190px;border-radius:14px;overflow:hidden;border:1.5px solid var(--track);}
+.coords-readout{font-size:12px;color:var(--ink2);text-align:center;padding:6px 0 2px;min-height:22px;}
+.link-or{text-align:center;font-size:12px;color:var(--ink2);font-weight:700;margin:2px 0;}
+.result-card{background:var(--green2);color:#fff;border-radius:14px;padding:14px 16px;margin-top:4px;}
+.result-card .result-url{font-family:'JetBrains Mono',monospace;font-size:11px;word-break:break-all;margin-bottom:10px;opacity:.85;}
+.result-btns{display:flex;gap:8px;}
+.result-btns .btn{padding:10px;}
+
+/* ─── DRIVER PAGE ─────────────────────────── */
+#driverPage{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.driver-card{width:100%;max-width:380px;background:var(--surface);border-radius:28px;box-shadow:0 16px 40px -16px rgba(27,58,43,.25);padding:26px 22px 24px;}
+.driver-brand{font-size:13px;font-weight:800;color:var(--ink2);text-align:center;margin-bottom:14px;}
+.order-badge{text-align:center;font-size:14px;font-weight:600;margin-bottom:22px;color:var(--ink);}
+.order-badge b{font-weight:800;}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ ADMIN ═══════════ -->
+<div id="adminPage" class="hidden">
+  <div class="admin-top">
+    <div class="brand">🌸 FLOWERMAD — لوحة التوصيل</div>
+    <div class="tabs">
+      <button class="tab active" id="tabMap" onclick="switchTab('map')">🗺️ الخريطة والأوردرات</button>
+      <button class="tab" id="tabAdd" onclick="switchTab('add')">➕ أوردر جديد</button>
+    </div>
+  </div>
+
+  <!-- MAP TAB -->
+  <div class="panel" id="mapPanel">
+    <div id="dashMap"></div>
+    <div class="orders-table">
+      <div class="orders-table-head">
+        <div>أوردر</div>
+        <div>العميل</div>
+        <div>المسافة</div>
+        <div>الحالة</div>
+      </div>
+      <div id="ordersList"><div class="empty-state">لا يوجد أوردرات بعد — أضف من تبويب «أوردر جديد»</div></div>
+    </div>
+  </div>
+
+  <!-- ADD ORDER TAB -->
+  <div class="panel hidden" id="addPanel">
+    <h2>إنشاء لينك توصيل</h2>
+
+    <div class="row2">
+      <div class="field-block">
+        <label>رقم الأوردر *</label>
+        <input type="text" id="genOrderId" placeholder="12345">
+      </div>
+      <div class="field-block">
+        <label>اسم العميل</label>
+        <input type="text" id="genName" placeholder="سارة أحمد">
+      </div>
+    </div>
+
+    <div class="field-block">
+      <label>📌 الصق رابط Google Maps أو Plus Code للعميل</label>
+      <div class="search-row">
+        <input type="text" id="genMapsLink" placeholder="رابط خرائط أو Plus Code مثل: XVWF+3R القاهرة">
+        <button type="button" id="extractBtn">📍 استخراج</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--ink2);margin-top:5px;line-height:1.6;">
+        💡 في Google Maps: دوس على المكان ← دوس على الـ Plus Code اللي بيظهر ← نسخ ← الصقه هنا
+      </div>
+      <div class="coords-readout" id="coordsReadout">أو ابحث بالنص أو دوس على الخريطة</div>
+    </div>
+
+    <div class="field-block">
+      <label>🔍 بحث بالاسم أو العنوان</label>
+      <div class="search-row">
+        <input type="text" id="genSearch" placeholder="اكتب اسم المنطقة أو الشارع">
+        <button type="button" id="genSearchBtn">🔍 بحث</button>
+      </div>
+    </div>
+
+    <div class="field-block">
+      <label>أو دوس على الخريطة مباشرة</label>
+      <div id="addMap"></div>
+    </div>
+
+    <button class="btn btn-rose" id="genBtn">🔗 إنشاء اللينك وإضافة للوحة</button>
+
+    <div class="hidden" id="resultCard">
+      <div class="result-card">
+        <div class="result-url" id="resultUrl"></div>
+        <div class="result-btns">
+          <button class="btn btn-ghost" id="genCopyBtn" style="color:#fff;border-color:rgba(255,255,255,.3);">📋 نسخ</button>
+          <a class="btn btn-green" id="genWaBtn" href="#" target="_blank" style="text-decoration:none;text-align:center;">📲 واتساب</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ DRIVER ═══════════ -->
+<div id="driverPage" class="hidden">
+  <div class="driver-card">
+    <div class="driver-brand">🌸 FLOWERMAD</div>
+    <div class="order-badge" id="driverOrderBadge"></div>
+
+    <div id="driverMain">
+      <div style="text-align:center;margin:8px 0 24px;">
+        <div style="font-size:62px;line-height:1;margin-bottom:12px;">🗺️</div>
+        <div style="font-size:17px;font-weight:800;margin-bottom:6px;">اضغط هنا لبدء التوصيل</div>
+        <div style="font-size:13px;color:var(--ink2);line-height:1.65;">المتصفح هيطلب إذن موقعك — وافق وهيفتحلك Google Maps على عنوان العميل فوراً</div>
+      </div>
+      <button class="btn btn-rose" id="driverStartBtn" style="font-size:17px;padding:16px;">🚀 ابدأ التوصيل</button>
+      <div id="driverStatus" style="text-align:center;font-size:13px;color:var(--ink2);margin-top:12px;min-height:18px;"></div>
+    </div>
+
+    <div id="driverDenied" class="hidden">
+      <div style="text-align:center;margin:10px 0 20px;">
+        <div style="font-size:46px;margin-bottom:10px;">🔒</div>
+        <p style="font-size:14px;color:var(--ink2);line-height:1.8;margin-bottom:6px;">محتاج إذن الموقع — وافق على طلب المتصفح</p>
+        <p style="font-size:12.5px;color:var(--ink2);line-height:1.6;">لو مش ظهرتلك رسالة، روح إعدادات المتصفح واسمح بالموقع</p>
+      </div>
+      <button class="btn btn-rose" id="driverRetryBtn" style="margin-bottom:10px;">🔄 حاول تاني</button>
+      <a class="btn btn-green" id="driverDirectLink" href="#" target="_blank" style="text-decoration:none;text-align:center;display:block;">🗺️ افتح Google Maps بدون موقع</a>
+    </div>
+
+    <div id="driverDone" class="hidden">
+      <div style="width:90px;height:90px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;margin:4px auto 16px;">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="text-align:center;font-size:21px;font-weight:800;color:var(--green2);margin-bottom:4px;">تم التوصيل ✅</div>
+      <div style="text-align:center;font-size:14px;color:var(--ink2);margin-bottom:18px;">الساعة <b id="driverDoneTime" style="font-family:'JetBrains Mono',monospace;color:var(--ink);"></b></div>
+      <button class="btn btn-ghost" id="driverCopyBtn">📋 نسخ تفاصيل التسليم</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+// ── HELPERS ──────────────────────────────────────
+const el = id => document.getElementById(id);
+const toastEl = el('toast');
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('on');
+  clearTimeout(toastEl._t);
+  toastEl._t = setTimeout(()=>toastEl.classList.remove('on'),2400);
+}
+function copyText(text,cb){
+  if(navigator.clipboard){ navigator.clipboard.writeText(text).then(cb).catch(()=>fbCopy(text,cb)); }
+  else fbCopy(text,cb);
+}
+function fbCopy(text,cb){
+  const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();
+  try{document.execCommand('copy');cb();}catch(e){showToast('انسخه يدوياً');}
+  document.body.removeChild(ta);
+}
+function haversine(la1,lo1,la2,lo2){
+  const R=6371000,r=d=>d*Math.PI/180;
+  const a=Math.sin(r(la2-la1)/2)**2+Math.cos(r(la1))*Math.cos(r(la2))*Math.sin(r(lo2-lo1)/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function fmtDist(m){
+  if(m===null||m===undefined) return '—';
+  if(m>=1000) return (m/1000).toFixed(1)+' كم';
+  return Math.round(m)+' م';
+}
+function fmtTime(d){
+  let h=d.getHours();const m=d.getMinutes().toString().padStart(2,'0');
+  const p=h<12?'ص':'م';h=h%12||12;return h+':'+m+' '+p;
+}
+function distClass(m){
+  if(m===null) return 'dist-idle';
+  if(m<100) return 'dist-near';
+  if(m<500) return 'dist-mid';
+  return 'dist-far';
+}
+
+// ── ROUTING ──────────────────────────────────────
+const params = new URLSearchParams(location.search);
+const orderId = params.get('orderId');
+const lat = parseFloat(params.get('lat'));
+const lng = parseFloat(params.get('lng'));
+const isDriver = !!orderId && !isNaN(lat) && !isNaN(lng);
+const isAdmin = params.get('admin') === '1' || !isDriver;
+
+if(isDriver) initDriver();
+else initAdmin();
+
+// ══════════════════════════════════════════════════
+// ADMIN
+// ══════════════════════════════════════════════════
+function initAdmin(){
+  el('adminPage').classList.remove('hidden');
+
+  // shared state
+  let orders = loadOrders(); // [{id,name,lat,lng,dist:null,status:'idle'|'live'|'done'}]
+  let dashMap, addMap, dashMarkers={}, customerMarker=null;
+  let selLat=null, selLng=null, addMapMarker=null;
+
+  // ── build dashboard map ──
+  dashMap = L.map('dashMap').setView([30.05,31.25],10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(dashMap);
+
+  // ── build add-order map ──
+  addMap = L.map('addMap').setView([30.05,31.25],10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(addMap);
+  addMap.on('click',e=>setAddMarker(e.latlng.lat,e.latlng.lng));
+
+  renderOrders();
+  startLiveUpdate();
+
+  // ── TAB switch ──
+  window.switchTab = function(t){
+    el('tabMap').classList.toggle('active',t==='map');
+    el('tabAdd').classList.toggle('active',t==='add');
+    el('mapPanel').classList.toggle('hidden',t!=='map');
+    el('addPanel').classList.toggle('hidden',t!=='add');
+    if(t==='map'){ setTimeout(()=>dashMap.invalidateSize(),120); }
+    else { setTimeout(()=>addMap.invalidateSize(),120); }
+  };
+
+  // ── Extract coords from Google Maps link OR Plus Code ──
+  el('extractBtn').addEventListener('click', async function(){
+    const raw = el('genMapsLink').value.trim();
+    if(!raw){ showToast('الصق رابط الخريطة أو Plus Code أول'); return; }
+    const btn = el('extractBtn');
+    btn.disabled=true; btn.textContent='⏳ جاري...';
+
+    // 1. Plus Code? (e.g. "XVWF+3R" or "XVWF+3R Cairo" or "7GX2+QP+7H")
+    const plusCodeResult = await resolvePlusCode(raw);
+    if(plusCodeResult){
+      setAddMarker(plusCodeResult.lat, plusCodeResult.lng);
+      addMap.setView([plusCodeResult.lat, plusCodeResult.lng], 17);
+      btn.disabled=false; btn.textContent='📍 استخراج';
+      return;
+    }
+
+    // 2. Full Google Maps URL with coords embedded
+    const coords = extractCoordsFromUrl(raw);
+    if(coords){
+      setAddMarker(coords.lat, coords.lng);
+      addMap.setView([coords.lat,coords.lng],16);
+      btn.disabled=false; btn.textContent='📍 استخراج';
+      return;
+    }
+
+    // 3. Short link — can't resolve in browser. Tell user to use Plus Code instead.
+    if(raw.includes('goo.gl') || raw.includes('maps.app') || raw.includes('bit.ly')){
+      showToast('الروابط القصيرة مش بتشتغل — استخدم Plus Code بدلها (شرح تحت)');
+      btn.disabled=false; btn.textContent='📍 استخراج';
+      return;
+    }
+
+    showToast('مش قدرت أستخرج — جرب Plus Code أو دوس على الخريطة');
+    btn.disabled=false; btn.textContent='📍 استخراج';
+  });
+
+  // Resolve Plus Code using Nominatim (free, no API key needed)
+  async function resolvePlusCode(input){
+    // Plus Code patterns: short "XVWF+3R" or compound "XVWF+3R Cairo" or full "7GX2+QP7H+7H"
+    const plusCodeRegex = /^([23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3})/i;
+    const match = input.match(plusCodeRegex);
+    if(!match) return null;
+
+    const code = match[1];
+    // The rest after the code is the reference location (city/area)
+    const locality = input.slice(code.length).trim() || 'Egypt';
+
+    try{
+      // Use Nominatim to geocode the locality first, then decode the plus code
+      // We pass the full plus code + locality to Nominatim which supports OLC
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' 
+        + encodeURIComponent(code + ' ' + locality);
+      const res = await fetch(url, {headers:{'Accept-Language':'ar,en'}});
+      const data = await res.json();
+      if(data && data.length){
+        return {lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon)};
+      }
+
+      // Fallback: try with Egypt added
+      if(!locality.includes('Egypt') && !locality.includes('مصر')){
+        const url2 = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' 
+          + encodeURIComponent(code + ' Egypt');
+        const res2 = await fetch(url2, {headers:{'Accept-Language':'ar,en'}});
+        const data2 = await res2.json();
+        if(data2 && data2.length){
+          return {lat: parseFloat(data2[0].lat), lng: parseFloat(data2[0].lon)};
+        }
+      }
+    }catch(e){}
+    return null;
+  }
+
+  function extractCoordsFromUrl(url){
+    if(!url) return null;
+
+    // PRIORITY ORDER matters:
+    // 1. !8m2!3d!4d = most reliable: actual pin location in place URLs
+    // 2. !3d!4d = pin location (less specific match)
+    // 3. q=lat,lng = explicit query coords
+    // 4. ll=lat,lng = explicit coords param
+    // 5. destination=lat,lng = directions destination
+    // 6. /dir//lat,lng = directions to coords
+    // 7. @lat,lng = LAST RESORT: this is the MAP VIEW CENTER, not the pin!
+    //    It's often close but not exact, especially at low zoom levels.
+
+    const patterns = [
+      /!8m2!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,      // actual pin (most accurate)
+      /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,            // pin in data param
+      /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,           // ?q=lat,lng
+      /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,          // ?ll=lat,lng
+      /destination=(-?\d+\.\d+),(-?\d+\.\d+)/,     // directions destination
+      /\/dir\/\/(-?\d+\.\d+),(-?\d+\.\d+)/,     // /dir//lat,lng
+      /@(-?\d+\.\d+),(-?\d+\.\d+)/,                // map view center (last resort)
+    ];
+
+    for(const p of patterns){
+      const m = url.match(p);
+      if(m){
+        const la=parseFloat(m[1]),lo=parseFloat(m[2]);
+        if(la>=-90&&la<=90&&lo>=-180&&lo<=180) return {lat:la,lng:lo};
+      }
+    }
+    return null;
+  }
+
+  // ── Search by text ──
+  el('genSearchBtn').addEventListener('click', async function(){
+    const q = el('genSearch').value.trim();
+    if(!q){ showToast('اكتب اسم المكان'); return; }
+    const btn=el('genSearchBtn'); btn.disabled=true; btn.textContent='⏳';
+    
+    const tries=[q, q+' مصر', q+' Egypt', q+', Cairo, Egypt'];
+    let found=false;
+    for(const query of tries){
+      try{
+        const url='https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=eg&q='+encodeURIComponent(query);
+        const res=await fetch(url);const data=await res.json();
+        if(data&&data.length){
+          const r=data[0];
+          setAddMarker(parseFloat(r.lat),parseFloat(r.lon));
+          addMap.setView([r.lat,r.lon],16);
+          found=true;break;
+        }
+      }catch(e){}
+    }
+    if(!found) showToast('مش لاقيه — دوس على الخريطة بنفسك');
+    btn.disabled=false; btn.textContent='🔍 بحث';
+  });
+
+  function setAddMarker(la,ln){
+    selLat=la; selLng=ln;
+    if(addMapMarker) addMapMarker.setLatLng([la,ln]);
+    else{
+      addMapMarker=L.marker([la,ln],{draggable:true}).addTo(addMap);
+      addMapMarker.on('dragend',function(){
+        const p=addMapMarker.getLatLng();selLat=p.lat;selLng=p.lng;updateReadout();
+      });
+    }
+    updateReadout();
+  }
+  function updateReadout(){
+    el('coordsReadout').textContent='✅ '+selLat.toFixed(5)+', '+selLng.toFixed(5);
+  }
+
+  // ── Generate link ──
+  el('genBtn').addEventListener('click', function(){
+    const oId=el('genOrderId').value.trim();
+    const name=el('genName').value.trim();
+    if(!oId){showToast('اكتب رقم الأوردر');return;}
+    if(selLat===null){showToast('حدد لوكيشن العميل على الخريطة');return;}
+
+    const base=location.origin+location.pathname;
+    const p=new URLSearchParams();
+    p.set('orderId',oId);p.set('lat',selLat.toFixed(6));p.set('lng',selLng.toFixed(6));
+    if(name) p.set('name',name);
+    const finalUrl=base+'?'+p.toString();
+
+    // add to orders list
+    const existing=orders.findIndex(o=>o.id===oId);
+    const entry={id:oId,name:name||'',lat:selLat,lng:selLng,dist:null,status:'idle',url:finalUrl};
+    if(existing>=0) orders[existing]=entry; else orders.push(entry);
+    saveOrders(orders);
+    renderOrders();
+    refreshDashMarkers();
+
+    el('resultUrl').textContent=finalUrl;
+    el('resultCard').classList.remove('hidden');
+    el('genWaBtn').href='https://wa.me/?text='+encodeURIComponent('لينك توصيل الأوردر #'+oId+(name?' - '+name:'')+'\n'+finalUrl);
+
+    // reset form
+    el('genOrderId').value='';el('genName').value='';el('genSearch').value='';el('genMapsLink').value='';
+    selLat=null;selLng=null;
+    if(addMapMarker){addMap.removeLayer(addMapMarker);addMapMarker=null;}
+    el('coordsReadout').textContent='أو ابحث بالنص أو دوس على الخريطة';
+  });
+
+  el('genCopyBtn').addEventListener('click',()=>copyText(el('resultUrl').textContent,()=>showToast('تم نسخ اللينك ✅')));
+
+  // ── Render orders table ──
+  function renderOrders(){
+    const list=el('ordersList');
+    if(!orders.length){
+      list.innerHTML='<div class="empty-state">لا يوجد أوردرات بعد — أضف من تبويب «أوردر جديد»</div>';
+      return;
+    }
+    list.innerHTML=orders.map(o=>{
+      const distTxt = o.status==='done'?'وصل ✅':fmtDist(o.dist);
+      const dc = o.status==='done'?'dist-done':distClass(o.dist);
+      const badge = o.status==='live'?'<span class="obadge badge-live">● مباشر</span>':
+                    o.status==='done'?'<span class="obadge badge-done">تم</span>':
+                    '<span class="obadge badge-idle">انتظار</span>';
+      return `<div class="order-row">
+        <div class="oid">#${o.id}</div>
+        <div class="oname">${o.name||'—'}</div>
+        <div class="odist ${dc}">${distTxt}</div>
+        <div>${badge}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Dashboard map markers ──
+  function refreshDashMarkers(){
+    // Clear old
+    Object.values(dashMarkers).forEach(m=>dashMap.removeLayer(m));
+    dashMarkers={};
+    if(customerMarker){dashMap.removeLayer(customerMarker);customerMarker=null;}
+
+    const bounds=[];
+    orders.forEach(o=>{
+      const icon=L.divIcon({
+        className:'',
+        html:`<div style="background:${o.status==='done'?'#3E7A4F':o.status==='live'?'#D6577A':'#D89B3C'};color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);">#${o.id}</div>`,
+        iconSize:[28,28],iconAnchor:[14,14]
+      });
+      const m=L.marker([o.lat,o.lng],{icon}).addTo(dashMap);
+      m.bindPopup(`<b>#${o.id}</b>${o.name?' — '+o.name:''}<br>${o.status==='done'?'✅ تم التوصيل':fmtDist(o.dist)+' متبقي'}`);
+      dashMarkers[o.id]=m;
+      bounds.push([o.lat,o.lng]);
+    });
+    if(bounds.length) dashMap.fitBounds(bounds,{padding:[30,30],maxZoom:14});
+  }
+  refreshDashMarkers();
+
+  // ── Live updates via BroadcastChannel ──
+  // Each driver page broadcasts its position; admin listens and updates
+  let bc;
+  try{ bc=new BroadcastChannel('flowermad_delivery'); }catch(e){}
+  if(bc) bc.onmessage=function(e){
+    const {orderId:oid,dist,status}=e.data||{};
+    const o=orders.find(o=>o.id===oid);
+    if(o){
+      if(dist!==undefined) o.dist=dist;
+      if(status) o.status=status;
+      saveOrders(orders);
+      renderOrders();
+      // update marker color
+      if(dashMarkers[oid]){
+        const icon=L.divIcon({
+          className:'',
+          html:`<div style="background:${o.status==='done'?'#3E7A4F':o.status==='live'?'#D6577A':'#D89B3C'};color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);">#${o.id}</div>`,
+          iconSize:[28,28],iconAnchor:[14,14]
+        });
+        dashMarkers[oid].setIcon(icon);
+        dashMarkers[oid].setPopupContent(`<b>#${oid}</b>${o.name?' — '+o.name:''}<br>${o.status==='done'?'✅ تم التوصيل':fmtDist(o.dist)+' متبقي'}`);
+      }
+    }
+  };
+
+  // ── Also poll localStorage for cross-device updates ──
+  function startLiveUpdate(){
+    setInterval(()=>{
+      const fresh=loadOrders();
+      let changed=false;
+      fresh.forEach(fo=>{
+        const local=orders.find(o=>o.id===fo.id);
+        if(local&&(local.dist!==fo.dist||local.status!==fo.status)){
+          local.dist=fo.dist;local.status=fo.status;changed=true;
+        }
+      });
+      if(changed) renderOrders();
+    },4000);
+  }
+
+  function loadOrders(){
+    try{ return JSON.parse(localStorage.getItem('fm_orders')||'[]'); }catch(e){return [];}
+  }
+  function saveOrders(arr){ try{localStorage.setItem('fm_orders',JSON.stringify(arr));}catch(e){} }
+}
+
+// ══════════════════════════════════════════════════
+// DRIVER
+// ══════════════════════════════════════════════════
+function initDriver(){
+  el('driverPage').classList.remove('hidden');
+
+  const customerName=params.get('name')||'';
+  el('driverOrderBadge').innerHTML='أوردر <b>#'+orderId+'</b>'+(customerName?' — '+customerName:'');
+
+  const gmapsDirect='https://www.google.com/maps/dir/?api=1&destination='+lat+','+lng+'&travelmode=driving';
+  el('driverDirectLink').href=gmapsDirect;
+
+  // Broadcast channel for live updates to admin
+  let bc;
+  try{ bc=new BroadcastChannel('flowermad_delivery'); }catch(e){}
+
+  function broadcast(dist,status){
+    // update localStorage so admin page sees it on poll
+    try{
+      const orders=JSON.parse(localStorage.getItem('fm_orders')||'[]');
+      const o=orders.find(o=>o.id===orderId);
+      if(o){ if(dist!==undefined) o.dist=dist; if(status) o.status=status; localStorage.setItem('fm_orders',JSON.stringify(orders)); }
+    }catch(e){}
+    if(bc) bc.postMessage({orderId,dist,status});
+  }
+
+  el('driverStartBtn').addEventListener('click',function(){
+    el('driverStatus').textContent='جاري تحديد موقعك...';
+    el('driverStartBtn').disabled=true;
+    el('driverStartBtn').textContent='⏳ جاري...';
+
+    if(!navigator.geolocation){
+      window.location.href=gmapsDirect; return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      function(pos){
+        const oLat=pos.coords.latitude, oLng=pos.coords.longitude;
+        const dist=haversine(lat,lng,oLat,oLng);
+        broadcast(dist,'live');
+
+        // Open Google Maps with origin → destination
+        const url='https://www.google.com/maps/dir/'+oLat+','+oLng+'/'+lat+','+lng+'/?travelmode=driving';
+        window.location.href=url;
+      },
+      function(){
+        el('driverStartBtn').disabled=false;
+        el('driverStartBtn').textContent='🚀 ابدأ التوصيل';
+        el('driverStatus').textContent='';
+        el('driverMain').classList.add('hidden');
+        el('driverDenied').classList.remove('hidden');
+      },
+      {enableHighAccuracy:true,timeout:15000,maximumAge:0}
+    );
+  });
+
+  el('driverRetryBtn').addEventListener('click',function(){
+    el('driverDenied').classList.add('hidden');
+    el('driverMain').classList.remove('hidden');
+    el('driverStartBtn').disabled=false;
+    el('driverStartBtn').textContent='🚀 ابدأ التوصيل';
+  });
+
+  el('driverCopyBtn').addEventListener('click',function(){
+    const t='تم تسليم الأوردر #'+orderId+(customerName?' - '+customerName:'')+' الساعة '+fmtTime(new Date());
+    copyText(t,()=>showToast('تم النسخ ✅'));
+  });
+}
+
+})();
+</script>
+</body>
+</html>
